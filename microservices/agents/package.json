@@ -1,0 +1,23 @@
+{
+    "name": "search-agent_app",
+    "description": "A wrapper around vertexai search on gcp",
+    "version": "1.0.0",
+    "private": true,
+    "license": "Apache",
+    "author": "Monojit Datta",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "install": "npm install --unsafe-perm --save-dev express jshint dotenv axios google-auth-library",
+        "start": "node search-agent.js"
+    },
+    "engines": {
+        "node": ">=16.0.0"
+    },
+    "devDependencies": {
+        "axios": "^1.10.0",
+        "dotenv": "^16.5.0",
+        "express": "^5.1.0",
+        "google-auth-library": "^10.1.0",
+        "jshint": "^2.13.6"
+    }
+}

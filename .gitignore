@@ -1,0 +1,15 @@
+!.gitignore
+**/.DS_Store
+**/.env
+**/misc/**
+!**/misc/*.tpl.*
+**/node_modules
+**/package-lock.json
+**/data
+**/logs
+**/*.plan
+**/*.tfvars
+**/certs
+**/values
+!**/values.tmpl/**
+
