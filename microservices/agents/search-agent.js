@@ -84,6 +84,7 @@ function prepareAgentInfo(request)
     const agentInfo = {};
     agentInfo.sessionId = request.params.sessionId;    
     agentInfo.pageSize = Number(request.query.pagesize);
+    agentInfo.languageCode = request.headers.language;
     agentInfo.engineId = request.body.engine;
     agentInfo.datastoreId = request.params.datastore;
     agentInfo.query = request.body.query;
