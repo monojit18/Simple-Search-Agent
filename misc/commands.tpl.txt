@@ -1,0 +1,62 @@
+BASEFOLDERPATH=
+PROJECT_ID=
+OWNER=
+GSA=
+GSA_DISPLAY_NAME=
+REGION=asia-southeast1
+ZONE=asia-southeast1-a
+AI_LOCATION=us-central1
+
+gcloud auth login
+gcloud auth list
+gcloud config set account $OWNER
+gcloud services enable cloudresourcemanager.googleapis.com
+
+gcloud config set project $PROJECT_ID
+#gcloud auth application-default login
+
+gcloud config set compute/region $REGION
+gcloud config set compute/zone $ZONE
+
+gcloud iam service-accounts list
+gcloud projects add-iam-policy-binding $PROJECT_ID --member=serviceAccount:$GSA --role=roles/owner
+gcloud projects add-iam-policy-binding $PROJECT_ID --member=serviceAccount:$GSA --role=roles/iam.serviceAccountUser
+gcloud projects add-iam-policy-binding $PROJECT_ID --member=serviceAccount:$GSA --role=roles/iam.serviceAccountTokenCreator
+
+gcloud iam service-accounts keys create $BASEFOLDERPATH/misc/$PROJECT_ID-sa.json --iam-account=$GSA
+gcloud auth activate-service-account $GSA --key-file=$BASEFOLDERPATH/misc/$GSA_DISPLAY_NAME.json
+#gcloud config set account $GSA
+gcloud auth list
+
+gcloud config set project $PROJECT_ID
+gcloud config set compute/region $REGION
+gcloud config set compute/zone $ZONE
+
+Search-Engine
+==========================================================================================
+Cloud build
+===========
+cd $BASEFOLDERPATH/microservices/agents
+PROJECT_NAME=""
+REPO_NAME=""
+PACKAGE_NAME="search-agentlib"
+PACKAGE_VERSION="v1.0"
+
+gcloud builds submit --config="$BASEFOLDERPATH/distribution/builds/app-deploy/app-deploy.yaml" \
+--project=$PROJECT_ID --substitutions=_PROJECT_ID_=$PROJECT_ID,_PROJECT_NAME_=$PROJECT_NAME,_REGION_=$REGION,\
+_REPO_NAME_=$REPO_NAME,_PACKAGE_NAME_=$PACKAGE_NAME,_PACKAGE_VERSION_=$PACKAGE_VERSION,\
+_LOG_BUCKET_=$PROJECT_ID-terra-stg
+
+cd $BASEFOLDERPATH/distribution
+WORKING_DIR="cloud-run"
+RESOURCE_NAME="search-agentlib"
+
+gcloud builds submit --config="./builds/cloud-run/run-deploy.yaml" \
+--project=$PROJECT_ID --substitutions=_PROJECT_ID_=$PROJECT_ID,_PROJECT_NAME_=$PROJECT_NAME,\
+_WORKING_DIR_="$WORKING_DIR",_TF_VARS_PATH_="./values/search-agent-values.tfvars",\
+_LOG_BUCKET_=$PROJECT_ID-terra-stg,_RESOURCE_NAME_=$RESOURCE_NAME
+
+#gcloud builds submit --config="./builds/cloud-run/run-destroy.yaml" \
+--project=$PROJECT_ID --substitutions=_PROJECT_ID_=$PROJECT_ID,_PROJECT_NAME_=$PROJECT_NAME,\
+_WORKING_DIR_="$WORKING_DIR",_TF_VARS_PATH_="./values/search-agent-values.tfvars",\
+_LOG_BUCKET_=$PROJECT_ID-terra-stg,_RESOURCE_NAME_=$RESOURCE_NAME
