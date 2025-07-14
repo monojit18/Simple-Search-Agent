@@ -2,7 +2,7 @@
 
 ## High Level Design overview
 
-![simple-search-arch](/Users/monojitd/Library/CloudStorage/GoogleDrive-datta.monojit@gmail.com/My Drive/Dumps/Sequelstring/Simple-Search-Agent/Images/simple-search-arch.png)
+![simple-search-arch](./assets/images/simple-search-arch.png)
 
 
 
