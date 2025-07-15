@@ -164,7 +164,315 @@ gcloud artifacts repositories describe $AR_REPO --location=$REGION
 
 
 
-### Deploy to Cloud Run
+### Distribution
+
+> [!NOTE]
+>
+> This document uses [Cloud Build](https://cloud.google.com/build/docs) scripts for all deployment onto GCP.  Cloud Build scripts are desinged to call terraforn scripts internally for deploying individual resources. This can be replaced by any other deployment automation tool of choice.
+>
+> The solution is deployed to Cloud Run instances on GCP. This can be replaced by other similar services like GKE.
+
+Let us examine the Files used for distributing the solution and how to use them for deployment.
+
+#### Build and Push Container Images
+
+#### /distribution/builds/app-deploy/app-deploy.yaml
+
+```yaml
+steps:
+- name: 'docker'  
+  args: ['build', '-t', '${_REGION_}-docker.pkg.dev/${_PROJECT_ID_}/${_REPO_NAME_}/${_PACKAGE_NAME_}:${_PACKAGE_VERSION_}', '.']
+images:
+- '${_REGION_}-docker.pkg.dev/${_PROJECT_ID_}/${_REPO_NAME_}/${_PACKAGE_NAME_}:${_PACKAGE_VERSION_}'
+tags: ['cloud-builders-community']
+serviceAccount: "projects/${_PROJECT_ID_}/serviceAccounts/${_PROJECT_NAME_}-sa@${_PROJECT_ID_}.iam.gserviceaccount.com"
+logsBucket: "gs://${_LOG_BUCKET_}"
+substitutions:
+  _PROJECT_ID_: ''
+  _PROJECT_NAME_: ''
+  _REGION_: ''
+  _REPO_NAME_: ''
+  _PACKAGE_NAME_: ''
+  _PACKAGE_VERSION_: ''
+  _LOG_BUCKET_: ''
+options:
+    dynamicSubstitutions: true
+
+```
+
+
+
+#### Deploy Cloud Run
+
+#### /distribution/cloud-run/backend.tf
+
+- GCS Bucket to hold Terraform State
+
+```json
+terraform {
+  backend "gcs" {
+    bucket = "<bucket for holding terraform state>"
+    prefix = ""
+  }
+}
+```
+
+
+
+#### /distribution/cloud-run/variables.tf
+
+- Template file for Terrform variables.
+- Actual values to be passed from environment specific files (*shown below*)
+
+```json
+variable "projectInfo"{    
+    type = object({
+        project = string
+        region = string        
+        serviceAccount = string
+    })
+    
+    default = {
+        project = ""
+        region = ""
+        serviceAccount = ""
+    }
+}
+
+variable "cloudrunInfo"{
+    type = object({
+        name = string        
+        spec = object({
+            image = string
+            ingress = string
+            minCount = optional(string)
+            maxCount = optional(string)
+            traffic = number            
+            limits = object({
+                cpu = string
+                memory = string
+            })
+            requests = object({
+                cpu = string
+                memory = string
+            })             
+        })
+        ports = object({
+            name = string
+            protocol = string
+            container_port = number
+        })
+        envVars = optional(list(object({
+            name = string
+            value = string
+        })))        
+        members = list(string)        
+    })
+
+    default = {
+        name = ""
+        spec = {
+            image = ""
+            ingress = ""                        
+            traffic = 100            
+            requests = {
+                cpu = ""
+                memory = ""
+            }
+            limits = {
+                cpu = ""
+                memory = ""
+            }
+        }
+        ports = {
+            name = ""
+            protocol = ""
+            container_port = 0
+        }
+        envVars = []        
+        members = []        
+    }    
+}
+```
+
+
+
+#### /distribution/cloud-run/run-deploy.tf
+
+- Terraform script to deploy Cloud Run instances
+
+```json
+provider "google" {
+    project = var.projectInfo.project
+    region = var.projectInfo.region
+}
+
+resource "google_cloud_run_service" "cr_service" {    
+    name = var.cloudrunInfo.name
+    location = var.projectInfo.region
+    template {
+      spec {
+        containers {
+          image = var.cloudrunInfo.spec.image
+          resources {
+            limits = {
+              cpu = var.cloudrunInfo.spec.limits.cpu
+              memory = var.cloudrunInfo.spec.limits.memory
+            }
+            requests = {
+              cpu = var.cloudrunInfo.spec.requests.cpu
+              memory = var.cloudrunInfo.spec.requests.memory
+            }
+          }
+          ports {
+            name = var.cloudrunInfo.ports.name
+            protocol = var.cloudrunInfo.ports.protocol
+            container_port = var.cloudrunInfo.ports.container_port 
+          }          
+          dynamic "env" {
+            for_each = var.cloudrunInfo.envVars
+            content {
+              name = env.value.name
+              value = env.value.value
+            }            
+          }
+        }        
+        service_account_name = var.projectInfo.serviceAccount
+      }
+      
+      metadata {
+        annotations = {
+          "autoscaling.knative.dev/minScale" = var.cloudrunInfo.spec.minCount
+          "autoscaling.knative.dev/maxScale" = var.cloudrunInfo.spec.maxCount        
+        }
+      }
+    }
+
+    traffic {
+      percent = var.cloudrunInfo.spec.traffic
+      latest_revision = true
+    }
+
+    metadata {
+      annotations = {
+        "run.googleapis.com/ingress" = var.cloudrunInfo.spec.ingress               
+      }
+    }
+}
+
+resource "google_cloud_run_service_iam_binding" "cr_binding" {  
+  project = var.projectInfo.project
+  location = var.projectInfo.region
+  service = var.cloudrunInfo.name
+  role = "roles/run.invoker"
+  members = var.cloudrunInfo.members
+  depends_on = [
+    google_cloud_run_service.cr_service
+  ]
+}
+```
+
+
+
+#### /distribution/cloud-run/values/search-agent-values.tfvars
+
+> [!NOTE]
+>
+> - Since these are sensitive values, this document suggests a secured approach to share this file through Source repository. 
+> - Copy **values** folder to a **values.tmpl** folder and repalce all secured values with placeholders.
+> - **values.tmpl** will be checked into the repository.
+> - **values** folder will be added to the **.gitgnre** to avoid check-in to the repository.
+
+
+
+```json
+projectInfo = {    
+    project = "<project_id>"
+    region = "<region>"
+    serviceAccount = "<service-account-name>@<project_id>.iam.gserviceaccount.com"
+}
+
+cloudrunInfo = {
+    name = "search-agentlib"
+    spec = {
+        image = "<repo-name>/search-agentlib:v1.0"
+        ingress = "all"
+        minCount = "1"
+        maxCount = "10"
+        traffic = 100
+        requests = {
+            cpu = "500m"
+            memory = "512Mi"
+        }
+        limits = {
+            cpu = "1000m"
+            memory = "1Gi"
+        }
+    }
+    ports = {
+        name = "http1"
+        protocol = "TCP"
+        container_port = 80
+    }
+    envVars = [
+    {
+        name = "service"
+        value = "search-agentlib:v1.0"
+    },
+    {
+        name = "DISCOVERY_ENGINE_HOST"
+        value = "discoveryengine.googleapis.com/v1alpha"
+    },
+    {
+        name = "DISCOVERY_ENGINE_SEARCH_PROMPT"
+        value = "You are a helpful assistant that answers the given question accurately based on the context provided to you. Make sure you answer the question in as much detail as possible, providing a comprehensive explanation. Do not hallucinate or answer the question by yourself. Provide the final answer in numbered steps. Also explain each steps in detail. Give the final answer in the following format, give the answer directly, dont add any prefix or suffix, Dont give the answer in json or array, just the steps trailed by comma or new line. Dont attach any reference or sources in the answer. If there is some version mention in the question, then get the answer from the contnet of that particular version only, dont take answer from any other version content. If the context contains any contract link relevant to the answer, then provide that link in the answer too. If an example or sample payload can be used to better explain the answer, provide that in the final answer as well. Give the final answer in the following format, give the answer directly, dont add any prefix or suffix. Dont attach any reference or sources in the answer.The user is an expert who has an in-depth understanding of the subject matter. The assistant should answer in a technical manner that uses specialized knowledge and terminology when it helps answer the query."
+    },
+    {
+        name = "PROJECT_ID"
+        value = "<project-id>"
+    }]
+    members = ["allUsers"]
+}
+```
+
+
+
+### Automate deployment to Cloud Run
+
+#### /distribution/builds/cloud-run/run-deploy.yaml
+
+- Cloud Build script to automate Cloud run deployment through terraform.
+- This script will execute all terraform steps (*init, plan, apply*)  sequentially.
+
+```json
+steps:
+- name: 'hashicorp/terraform:1.12.2'
+  dir: '${_WORKING_DIR_}'
+  args: ['init', '--reconfigure', '--backend-config=${_BKEND_CONFIG_}']  
+- name: 'hashicorp/terraform:1.12.2'
+  dir: '${_WORKING_DIR_}'
+  args: ['plan', '-out', 'out.plan', '-var-file', '${_TF_VARS_PATH_}']
+- name: 'hashicorp/terraform:1.12.2'
+  dir: '${_WORKING_DIR_}'
+  args: ['apply', 'out.plan']
+tags: ['cloud-builders-community']
+serviceAccount: "projects/${_PROJECT_ID_}/serviceAccounts/${_PROJECT_NAME_}-sa@${_PROJECT_ID_}.iam.gserviceaccount.com"
+logsBucket: "gs://${_LOG_BUCKET_}"
+substitutions:
+  _PROJECT_ID_: ''
+  _PROJECT_NAME_: ''
+  _WORKING_DIR_: ''  
+  _TF_VARS_PATH_: ''
+  _LOG_BUCKET_: ''
+  _RESOURCE_NAME_: ''
+  _BKEND_CONFIG_: 'prefix=terraform/state/${_WORKING_DIR_}/${_RESOURCE_NAME_}'
+options:
+    dynamicSubstitutions: true
+```
+
+
+
+#### Run Cloud Build script from CLI
 
 ```bash
 cd $BASEFOLDERPATH/microservices/agents
@@ -196,4 +504,6 @@ _LOG_BUCKET_=$PROJECT_ID-terra-stg,_RESOURCE_NAME_=$RESOURCE_NAME
 - [Vertex AI](https://cloud.google.com/vertex-ai/docs)
 - [Generative AI on Vertex AI](https://cloud.google.com/vertex-ai/generative-ai/docs/learn/overview)
 - [VertexAI Search](https://cloud.google.com/generative-ai-app-builder/docs/introduction)
+- [Cloud Build](https://cloud.google.com/build/docs)
+- [Cloud Run](https://cloud.google.com/run/docs)
 
