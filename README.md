@@ -15,11 +15,11 @@ Deployment uses the following tools:
 
 ### Pre-requisites
 
-- ### [Install the gcloud CLI](https://cloud.google.com/sdk/docs/install)
+- **gcloud CLI** - Used to setup the end to end Infrastructure on GCP.
+  - [Install the gcloud CLI](https://cloud.google.com/sdk/docs/install)
 
-- #### Alternate
-
-  - #### [Run gcloud commands with Cloud Shell](https://cloud.google.com/shell/docs/run-gcloud-commands)
+- Or, **GCP Cloud Shell**
+  - [Run gcloud commands with Cloud Shell](https://cloud.google.com/shell/docs/run-gcloud-commands)
 
 ## Step-by-Step guide
 
@@ -36,7 +36,7 @@ PROJECT_ID=<Project ID>
 (Note: This ideally should be same as PROJECT_ID; or any preferred name to identify the proejct)
 PROJECT_NAME=<Project NAME>
 
-(Note: Changing the below naming format for GSA_DISPLAY_NAME and GSA will need some change in the some of the deployment file(s) as explained later)
+(#Note: Changing the below naming format for GSA_DISPLAY_NAME and GSA will need some change in the some of the deployment file(s) as explained later)
 GSA_DISPLAY_NAME=$PROJECT_NAME-sa
 GSA=$GSA_DISPLAY_NAME@$PROJECT_ID.iam.gserviceaccount.com
 REGION=<GCP Region of the PROJECT>
@@ -130,20 +130,13 @@ gcloud storage buckets create gs://$PROJECT_ID-docs-stg-<some-random-no> --locat
 
 > [!Note]
 >
-> Important point to note about sharing secured information through deployment files.
+> This document outlines the secure mechanism for sharing deployment files, as these files may contain sensitive, system-specific information.
 >
-> This document follows a strict, secured mechanism to share deployment files as every deployment file might have system specific information on where it is getting deployed.
+> #### Deployment File Handling
 >
-> All template deployment files for Helm charts will be shared through a folder called **values.tpl**; which can be found under:
->
-> - **/distribution/cloud-run**
->
-> **Action**
->
-> - Copy **values.tpl** to a folder named as **values**
-> - Modify all template files inside newly created **values** folder with the values respective to the target system
-> - All subsequent deployment steps will use the **values** folder
->
+> - **Template Location:** All Helm chart deployment templates are located in the **/distribution/cloud-run/values.tpl** directory.
+>- **Procedure:** To prepare for deployment, copy the **values.tpl** folder to a new directory named **values**. Modify the files within the new **values** folder with the specific values for your target system.
+> - **Deployment Workflow:** All subsequent deployment steps will reference the modified **values** folder.
 
 
 
@@ -378,12 +371,14 @@ resource "google_cloud_run_service_iam_binding" "cr_binding" {
 
 > [!NOTE]
 >
-> - Since these are sensitive values, this document suggests a secured approach to share this file through Source repository. 
-> - Copy **values** folder to a **values.tmpl** folder and repalce all secured values with placeholders.
-> - **values.tmpl** will be checked into the repository.
-> - **values** folder will be added to the **.gitgnre** to avoid check-in to the repository.
-
-
+> Due to the sensitive nature of these values, this document recommends a secure method for sharing the file via a source repository.
+>
+> To implement this approach:
+>
+> - Copy the **values** folder to a new folder named **values.tmpl**.
+> - Replace all sensitive values within **values.tmpl** with placeholders.
+> - Check the **values.tmpl** file into the repository.
+> - Add the **values** folder to the **.gitignore** file to prevent it from being committed to the repository.
 
 ```json
 projectInfo = {    
@@ -493,6 +488,7 @@ gcloud builds submit --config="./builds/cloud-run/run-deploy.yaml" \
 _WORKING_DIR_="$WORKING_DIR",_TF_VARS_PATH_="./values/search-agent-values.tfvars",\
 _LOG_BUCKET_=$PROJECT_ID-terra-stg,_RESOURCE_NAME_=$RESOURCE_NAME
 
+#Delete the Cloud Run instance
 #gcloud builds submit --config="./builds/cloud-run/run-destroy.yaml" \
 --project=$PROJECT_ID --substitutions=_PROJECT_ID_=$PROJECT_ID,_PROJECT_NAME_=$PROJECT_NAME,\
 _WORKING_DIR_="$WORKING_DIR",_TF_VARS_PATH_="./values/search-agent-values.tfvars",\
