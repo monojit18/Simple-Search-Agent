@@ -161,7 +161,7 @@ gcloud artifacts repositories describe $AR_REPO --location=$REGION
 
 > [!NOTE]
 >
-> This document uses [Cloud Build](https://cloud.google.com/build/docs) scripts for all deployment onto GCP.  Cloud Build scripts are desinged to call terraforn scripts internally for deploying individual resources. This can be replaced by any other deployment automation tool of choice.
+> This document uses [Cloud Build](https://cloud.google.com/build/docs) scripts for all deployment onto GCP.  Cloud Build scripts are designed to call terraform scripts internally for deploying individual resources. This can be replaced by any other deployment automation tool of choice.
 >
 > The solution is deployed to Cloud Run instances on GCP. This can be replaced by other similar services like GKE.
 
