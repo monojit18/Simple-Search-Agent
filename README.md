@@ -1,4 +1,4 @@
-# Simple Search Agent - A naive Search engine for the enterprise
+# Enterprise Search, Simplified: Building Your Custom Internal Search Agent
 
 ## High Level Design overview
 
@@ -169,7 +169,7 @@ Let us examine the Files used for distributing the solution and how to use them 
 
 #### Build and Push Container Images
 
-#### /distribution/builds/app-deploy/app-deploy.yaml
+**/distribution/builds/app-deploy/app-deploy.yaml**
 
 ```yaml
 steps:
@@ -197,7 +197,7 @@ options:
 
 #### Deploy Cloud Run
 
-#### /distribution/cloud-run/backend.tf
+**/distribution/cloud-run/backend.tf**
 
 - GCS Bucket to hold Terraform State
 
@@ -212,7 +212,7 @@ terraform {
 
 
 
-#### /distribution/cloud-run/variables.tf
+**/distribution/cloud-run/variables.tf**
 
 - Template file for Terrform variables.
 - Actual values to be passed from environment specific files (*shown below*)
@@ -290,7 +290,7 @@ variable "cloudrunInfo"{
 
 
 
-#### /distribution/cloud-run/run-deploy.tf
+**/distribution/cloud-run/run-deploy.tf**
 
 - Terraform script to deploy Cloud Run instances
 
@@ -367,7 +367,7 @@ resource "google_cloud_run_service_iam_binding" "cr_binding" {
 
 
 
-#### /distribution/cloud-run/values/search-agent-values.tfvars
+**/distribution/cloud-run/values/search-agent-values.tfvars**
 
 > [!NOTE]
 >
@@ -434,7 +434,7 @@ cloudrunInfo = {
 
 ### Automate deployment to Cloud Run
 
-#### /distribution/builds/cloud-run/run-deploy.yaml
+**/distribution/builds/cloud-run/run-deploy.yaml**
 
 - Cloud Build script to automate Cloud run deployment through terraform.
 - This script will execute all terraform steps (*init, plan, apply*)  sequentially.
